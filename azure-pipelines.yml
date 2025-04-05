@@ -1,0 +1,60 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  sttfname: 'tfdeployments'
+  tfcontainer: 'tfstate'
+  tfkey: 'terraform.tfstate'
+
+stages:
+  - stage: tfValidate
+    jobs:
+      - job: validate
+        continueOnError: false
+        steps:
+        - task: TerraformInstaller@1
+          displayName: Terraform Install
+          inputs:
+            terraformVersion: 'latest'
+        - task: TerraformTaskV4@4
+          displayName: Terraform Init
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            backendServiceArm: 'Subscription Pay(b33d6810-b6d6-4bea-b373-4c7ef0572993)'
+            backendAzureRmResourceGroupName: 'rg-on-resources'
+            backendAzureRmStorageAccountName: 'storageinit'
+            backendAzureRmContainerName: 'tfstate'
+            backendAzureRmKey: '$(tfkey)'
+        - task: TerraformTaskV4@4
+          displayName: Terraform Validate
+          inputs:
+            provider: 'azurerm'
+            command: 'validate'
+  - stage: tfDeploy
+    condition: succeeded('tfValidate')
+    dependsOn: tfValidate
+    jobs:
+      - job: tfPlan
+        steps:
+          - task: TerraformTaskV4@4
+            displayName: Terraform Plan
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              environmentServiceNameAzureRM: 'Subscription Pay(b33d6810-b6d6-4bea-b373-4c7ef0572993)'
+          - task: TerraformTaskV4@4
+            displayName: Terraform Apply
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              commandOptions: '-auto-approve'
+              environmentServiceNameAzureRM: 'Subscription Pay(b33d6810-b6d6-4bea-b373-4c7ef0572993)'
